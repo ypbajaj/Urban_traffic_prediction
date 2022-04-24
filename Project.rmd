@@ -1,0 +1,185 @@
+---
+title: "Time_Series_Project"
+author: "Yash Bajaj"
+date: "4/19/2022"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(astsa)
+```
+
+
+```{r}
+df <- read.csv('C:/Users/hp/Documents/R/STAT 429/Project/Behavior of the urban traffic of the city of Sao Paulo in Brazil/Behavior of the urban traffic of the city of Sao Paulo in Brazil.csv',sep=';')
+df
+```
+
+```{r}
+df$Slowness.in.traffic....<-as.numeric(gsub(",", ".", gsub("\\.", "", df$Slowness.in.traffic....)))
+```
+
+```{r}
+df
+```
+
+```{r}
+ts.plot(diff(df$Slowness.in.traffic....))
+```
+
+
+
+Monday - Friday
+```{r}
+a1 <- length(df$Slowness.in.traffic....)
+b1 <- c()
+weekday <- c('Monday','Tuesday','Wednesday','Thursday','Friday')
+for(i in 0:(a1/27 -1)){
+      b1[(27*i+1):(27*i+28)] <- weekday[((i%%length(weekday))+1)]
+  }
+df$weekday <- b1[1:length(df$Slowness.in.traffic....)]
+```
+
+```{r}
+df
+```
+
+```{r}
+data <- df
+data$weekday <- as.factor(data$weekday)
+data$Hour..Coded. <- as.factor(data$Hour..Coded.)
+data$Time <- 1:135
+```
+
+
+```{r}
+data
+```
+
+```{r}
+summary(lm(Slowness.in.traffic....~Time,data=data))
+```
+
+```{r}
+plot(data$Time,data$Slowness.in.traffic....)
+```
+
+```{r}
+linear <- lm(Slowness.in.traffic....~.,data=data)
+summary(linear)
+```
+
+```{r}
+step_linear <- step(linear)
+```
+
+```{r}
+summary(step_linear)
+```
+
+```{r}
+summary(lm(Slowness.in.traffic.... ~ Hour..Coded. + Accident.victim + Occurrence.involving.freight + 
+    Lack.of.electricity + Point.of.flooding + Defect.in.the.network.of.trolleybuses + 
+    Tree.on.the.road + Intermittent.Semaphore + weekday,data=data))
+```
+```{r}
+Hour..Coded.
+lack
+point.of
+tree
+weekday
+```
+
+```{r}
+fm <- lm(Slowness.in.traffic.... ~ Hour..Coded. +  Lack.of.electricity + Point.of.flooding +  Tree.on.the.road +  weekday,data=data)
+summary(fm)
+```
+```{r}
+library(car)
+scatterplot(Slowness.in.traffic....~.,data=data)
+```
+
+```{r}
+dime <- dim(data)[2]
+for (i in 1:dime){
+  plot(data[,i],data$Slowness.in.traffic....,main=paste(colnames(data)[i]))
+}
+```
+
+```{r}
+plot(fm)
+```
+
+```{r}
+acf2(fm$residuals)
+```
+
+
+```{r}
+df1 <- read.csv('C:/Users/hp/Documents/R/STAT 429/Project/train.csv')
+df1
+df2<-read.csv('C:/Users/hp/Documents/R/STAT 429/Project/test.csv')
+```
+
+```{r}
+trans_df<-function(df1){
+df1$date <- as.Date(df1$date)
+df1$date<-as.POSIXct(df1$date)
+
+df1$month<-factor(format(df1$date,"%m"))
+df1$year<-as.numeric(format(df1$date,"%Y"))
+df1$day<-factor(format(df1$date,"%d"))
+df1$wday <- factor(weekdays(as.Date(df1$date)))
+df1$store<-factor(df1$store)
+
+df1$item<-factor(df1$item)
+df1<-df1[,!colnames(df1) %in% c('date','id')]
+}
+
+```
+```{r}
+df1<-trans_df(df1)
+```
+```{r}
+str(df1)
+
+mod<-lm(sales~.,data=df1)
+summary(mod)
+```
+
+```{r}
+df2$date <- as.Date(df2$date)
+df2$date<-as.POSIXct(df2$date)
+
+df2$month<-factor(format(df2$date,"%m"))
+df2$year<-as.numeric(format(df2$date,"%Y"))
+df2$day<-factor(format(df2$date,"%d"))
+df2$wday <- factor(weekdays(as.Date(df2$date)))
+df2$store<-factor(df2$store)
+
+df2$item<-factor(df2$item)
+df2<-df2[,!colnames(df2) %in% c('date','id')]
+names(df2)
+y_pred<-predict(mod,newdata = df2)
+
+
+```
+
+```{r}
+acf2(fm$residuals)
+```
+
+```{r}
+auto.arima(fm$residuals)
+```
+```{r}
+
+design <- data[,c('Hour..Coded.','Lack.of.electricity','Point.of.flooding','Tree.on.the.road','weekday')]
+design$weekday <- ifelse(design$weekday == 'Monday',1,ifelse(design$weekday == 'Tuesday',2,ifelse(design$weekday == 'Wednesday',3,ifelse(design$weekday == 'Thursday',4,5))))
+sarima(fm,1,0,0,xreg = design)
+```
+
