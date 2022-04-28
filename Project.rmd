@@ -15,9 +15,9 @@ library(dplyr)
 library(faraway)
 library(lmtest)
 library(MASS)
-
+library(forecast)
 library(car)
-
+library(fastDummies)
 library(Metrics)
 library(leaps)
 ```
@@ -189,149 +189,358 @@ shapiro.test(tran_model$residuals)
 avPlots(linear)
 ```
 
-#Train Test Split-
+Removing time as it has perfect multicollinearity with weekend.
 ```{r}
 drop <- c('Time')
 data.new = data[,!(names(data) %in% drop)]
 names(data.new)
 ```
-```{r}
-train_index = data.new["weekday"] == 'Friday'
-train = data.new[!train_index,]
-test = data.new[train_index,]
 
-dim(train)
-```
 
 ```{r}
-step_linear <- step(linear,direction='both')
+full.model <- lm(Slowness.in.traffic....~.,data=data.new)
+summary(full.model)
+```
+```{r}
+checkresiduals(full.model)
 ```
 
-```{r}
-summary(step_linear)
-```
 
 ```{r}
-summary(lm(Slowness.in.traffic.... ~ Hour..Coded. + Accident.victim + Occurrence.involving.freight + 
-    Lack.of.electricity + Point.of.flooding + Defect.in.the.network.of.trolleybuses + 
-    Tree.on.the.road + Intermittent.Semaphore + weekday,data=data))
-```
-```{r}
-Hour..Coded.
-lack
-point.of
-tree
-weekday
+AIC(full.model)
+BIC(full.model)
 ```
 
-```{r}
-fm <- lm(Slowness.in.traffic.... ~ Hour..Coded. +  Lack.of.electricity + Point.of.flooding +  Tree.on.the.road +  weekday,data=data)
-summary(fm)
-```
-```{r}
-library(car)
-scatterplot(Slowness.in.traffic....~.,data=data)
-```
+#RMSE-
+
+## RMSE Func
 
 ```{r}
-dime <- dim(data)[2]
-for (i in 1:dime){
-  plot(data[,i],data$Slowness.in.traffic....,main=paste(colnames(data)[i]))
+full = predict(full.model, newdata=data.new[,-18])
+calc_rmse<-function(x,y){
+  
+  diff=x-y
+  
+  sqrt(mean(diff^2))
 }
+
+calc_rmse(full,data.new$Slowness.in.traffic....)
+```
+
+#Step function using direction ='both'
+```{r}
+step_both_linear <- step(full.model,direction='both')
+```
+
+#Fitting model using step=both -
+```{r}
+step_both_linear_fit <- lm(Slowness.in.traffic.... ~ Hour..Coded. + Accident.victim + Occurrence.involving.freight + Lack.of.electricity + Point.of.flooding + Defect.in.the.network.of.trolleybuses + 
+Tree.on.the.road + Intermittent.Semaphore + weekday,data = data.new)
+summary(step_both_linear_fit)
 ```
 
 ```{r}
-plot(fm)
+checkresiduals(step_both_linear_fit)
 ```
 
 ```{r}
-acf2(fm$residuals)
+AIC(step_both_linear_fit)
+BIC(step_both_linear_fit)
 ```
 
-
-
-
-
+#RMSE-
 ```{r}
-str(df1)
+step_both = predict(step_both_linear_fit, newdata=data.new[,-18])
+calc_rmse<-function(x,y){
+  
+  diff=x-y
+  
+  sqrt(mean(diff^2))
+}
 
-mod<-lm(sales~.,data=df1)
-summary(mod)
+calc_rmse(step_both,data.new$Slowness.in.traffic....)
+```
+#Step function direction=forward -
+```{r}
+step_forward_linear <- step(full.model,direction='forward')
 ```
 
-
-
+#Fitting model using step=forward -
 ```{r}
-acf2(fm$residuals)
+step_forward_linear_fit <- lm(Slowness.in.traffic.... ~ Hour..Coded. +              Immobilized.bus + Broken.Truck + Vehicle.excess + Accident.victim +           Running.over + Fire.vehicles + 
+    Occurrence.involving.freight + Incident.involving.dangerous.freight + 
+    Lack.of.electricity + Fire + Point.of.flooding + Manifestations + 
+    Defect.in.the.network.of.trolleybuses + Tree.on.the.road + 
+    Semaphore.off + Intermittent.Semaphore + weekday,data = data.new)
+summary(step_forward_linear_fit)
 ```
 
 ```{r}
-auto.arima(fm$residuals)
+checkresiduals(step_forward_linear_fit)
 ```
+
 ```{r}
+AIC(step_forward_linear_fit)
+BIC(step_forward_linear_fit)
+```
+
+#RMSE-
+```{r}
+step_forward = predict(step_forward_linear_fit, newdata=data.new[,-18])
+calc_rmse<-function(x,y){
+  
+  diff=x-y
+  
+  sqrt(mean(diff^2))
+}
+
+calc_rmse(step_forward,data.new$Slowness.in.traffic....)
+```
+
+#Step function direction=backward -
+```{r}
+step_backward_linear <- step(full.model,direction='backward')
+```
+
+#Fitting model using step=backward -
+```{r}
+step_backward_linear_fit <- lm(Slowness.in.traffic.... ~Hour..Coded. + Accident.victim + Occurrence.involving.freight + 
+    Lack.of.electricity + Point.of.flooding + Defect.in.the.network.of.trolleybuses + 
+    Tree.on.the.road + Intermittent.Semaphore + weekday,data = data.new)
+summary(step_backward_linear_fit)
+```
+
+```{r}
+checkresiduals(step_backward_linear_fit)
+```
+
+```{r}
+AIC(step_backward_linear_fit)
+BIC(step_backward_linear_fit)
+```
+
+#RMSE-
+```{r}
+step_backward = predict(step_backward_linear_fit, newdata=data.new[,-18])
+calc_rmse<-function(x,y){
+  
+  diff=x-y
+  
+  sqrt(mean(diff^2))
+}
+
+calc_rmse(step_backward,data.new$Slowness.in.traffic....)
+```
+
 #Leaps
-library(leaps)
-leap <- regsubsets(Slowness.in.traffic....~.,data=data,nvmax=19)
-var <- summary(leap)
-names(var)
-```
 ```{r}
-coef(leap, which.min(var$cp))
+leap = regsubsets(Slowness.in.traffic.... ~ ., data=data.new, nvmax = ncol(data.new)-1)
+leap.summary = summary(leap)
+
+n = dim(data.new)[1]
+msize = 2:ncol(data.new)
+
+par(mfrow=c(2,2))
+plot(msize, leap.summary$adjr2, xlab="No. of Parameters", ylab = "Adjusted Rsquare") 
+Aic = n*log(leap.summary$rss/n) + 2*msize; 
+plot(msize, Aic, xlab="No. of Parameters", ylab = "AIC"); 
+Bic = n*log(leap.summary$rss/n) + msize*log(n); 
+plot(msize, Bic, xlab="No. of Parameters", ylab = "BIC")
+plot(msize, leap.summary$cp, xlab="No. of Parameters", ylab = "Mallow's Cp")
 ```
-
-```{r}
-coef(leap, which.min(var$adjr2))
-```
-```{r}
-coef(leap, which.min(var$bic))
-```
-
-```{r}
-par(mfrow = c(2, 2))
-plot(var$rss, xlab = "Number of Variables", ylab = "RSS", type = "b")
-
-plot(var$adjr2, xlab = "Number of Variables", ylab = "Adjusted RSq", type = "b")
-best_adj_r2 = which.max(var$adjr2)
-points(best_adj_r2, var$adjr2[best_adj_r2],
-       col = "red",cex = 2, pch = 20)
-
-plot(var$cp, xlab = "Number of Variables", ylab = "Cp", type = 'b')
-best_cp = which.min(var$cp)
-points(best_cp, var$cp[best_cp], 
-       col = "red", cex = 2, pch = 20)
-
-plot(var$bic, xlab = "Number of Variables", ylab = "BIC", type = 'b')
-best_bic = which.min(var$bic)
-points(best_bic, var$bic[best_bic], 
-       col = "red", cex = 2, pch = 20)
-```
-
 
 ```{r}
-
-design <- data[,c('Hour..Coded.','Lack.of.electricity','Point.of.flooding','Tree.on.the.road','weekday')]
-design$weekday <- ifelse(design$weekday == 'Monday',1,ifelse(design$weekday == 'Tuesday',2,ifelse(design$weekday == 'Wednesday',3,ifelse(design$weekday == 'Thursday',4,5))))
-sarima(fm,1,0,0,xreg = design)
+rs<-leap.summary
+colnames(rs$which)[rs$which[which.max(rs$adjr2),]][-1]
+```
+```{r}
+adjr2.model <- lm(Slowness.in.traffic....~  Hour..Coded.        
++ Lack.of.electricity                  
++ Point.of.flooding                 
++ Defect.in.the.network.of.trolleybuses
++ Tree.on.the.road                   
++ weekday,data = data.new)
+summary(adjr2.model)
 ```
 
-#```{r}
-<!-- # df1 <- read.csv('C:/Users/hp/Documents/R/STAT 429/Project/train.csv') -->
-<!-- # df1 -->
-<!-- # df2<-read.csv('C:/Users/hp/Documents/R/STAT 429/Project/test.csv') -->
+```{r}
+checkresiduals(adjr2.model)
+```
 
-<!-- df2$date <- as.Date(df2$date) -->
-<!-- df2$date<-as.POSIXct(df2$date) -->
+```{r}
+AIC(adjr2.model)
+BIC(adjr2.model)
+```
 
-<!-- df2$month<-factor(format(df2$date,"%m")) -->
-<!-- df2$year<-as.numeric(format(df2$date,"%Y")) -->
-<!-- df2$day<-factor(format(df2$date,"%d")) -->
-<!-- df2$wday <- factor(weekdays(as.Date(df2$date))) -->
-<!-- df2$store<-factor(df2$store) -->
+#RMSE-
+```{r}
+leap_adjr2 = predict(adjr2.model, newdata=data.new[,-18])
+calc_rmse<-function(x,y){
+  
+  diff=x-y
+  
+  sqrt(mean(diff^2))
+}
 
-<!-- df2$item<-factor(df2$item) -->
-<!-- df2<-df2[,!colnames(df2) %in% c('date','id')] -->
-<!-- names(df2) -->
-<!-- y_pred<-predict(mod,newdata = df2) -->
+calc_rmse(leap_adjr2,data.new$Slowness.in.traffic....)
+```
+
+
+```{r}
+col = colnames(rs$which)[rs$which[which.min(Bic),]][-1]
+col
+```
+
+
+```{r}
+bic.model <- lm(Slowness.in.traffic....~  Hour..Coded.        
++ Lack.of.electricity                  
++ Point.of.flooding                 
++ Defect.in.the.network.of.trolleybuses
++ Intermittent.Semaphore                   
++ weekday,data = data.new)
+summary(bic.model)
+```
+
+```{r}
+checkresiduals(bic.model)
+```
+
+```{r}
+AIC(bic.model)
+BIC(bic.model)
+```
+
+#RMSE-
+```{r}
+leap_bic = predict(bic.model, newdata=data.new[,-18])
+calc_rmse<-function(x,y){
+  
+  diff=x-y
+  
+  sqrt(mean(diff^2))
+}
+
+calc_rmse(leap_bic,data.new$Slowness.in.traffic....)
+```
+
+
+(Intercept)                           6.89e-08 ***
+Hour..Coded.2                         0.977757    
+Hour..Coded.3                         0.252036    
+Hour..Coded.4                         0.089922 .  
+Hour..Coded.5                         0.001013 ** 
+Hour..Coded.6                         0.009653 ** 
+Hour..Coded.7                         0.072726 .  
+Hour..Coded.8                         0.058399 .  
+Hour..Coded.9                         0.028195 *  
+Hour..Coded.10                        0.025387 *  
+Hour..Coded.11                        0.034785 *  
+Hour..Coded.12                        0.103672    
+Hour..Coded.13                        0.015226 *  
+Hour..Coded.14                        0.037433 *  
+Hour..Coded.15                        0.130840    
+Hour..Coded.16                        0.017217 *  
+Hour..Coded.17                        0.009853 ** 
+Hour..Coded.18                        0.007725 ** 
+Hour..Coded.19                        0.000458 ***
+Hour..Coded.20                        6.49e-05 ***
+Hour..Coded.21                        3.50e-06 ***
+Hour..Coded.22                        1.02e-08 ***
+Hour..Coded.23                        3.49e-10 ***
+Hour..Coded.24                        3.28e-10 ***
+Hour..Coded.25                        2.80e-12 ***
+Hour..Coded.26                        1.63e-11 ***
+Hour..Coded.27                        2.88e-06 ***
+Accident.victim                       0.178102    
+Occurrence.involving.freight          0.155181    
+Lack.of.electricity                   0.001445 ** 
+Point.of.flooding                     3.48e-05 ***
+Defect.in.the.network.of.trolleybuses 0.117714    
+Tree.on.the.road                      0.035118 *  
+Intermittent.Semaphore                0.194071    
+weekdayMonday                         6.16e-10 ***
+weekdayThursday                       0.051972 .  
+weekdayTuesday                        0.002761 ** 
+weekdayWednesday                      0.010934 *
+
+```{r}
+final_data <- subset(data.new,select = c('Hour..Coded.','Lack.of.electricity','Point.of.flooding','Tree.on.the.road','weekday','Slowness.in.traffic....'))
+final_data
+```
+
+```{r}
+final_data_fac <- dummy_cols(final_data, select_columns = c('Hour..Coded.','weekday'),remove_first_dummy = TRUE,remove_selected_columns = TRUE)
+final_data_fac = subset(final_data_fac,select=c('Hour..Coded._5','Hour..Coded._19','Hour..Coded._20','Hour..Coded._21','Hour..Coded._22','Hour..Coded._23','Hour..Coded._24','Hour..Coded._25','Hour..Coded._26','Hour..Coded._27','Lack.of.electricity','Point.of.flooding','Tree.on.the.road','weekday_Monday','Slowness.in.traffic....'))
+  final_data_fac
+```
+
+```{r}
+final_model <- lm(Slowness.in.traffic....~.,data=final_data_fac)
+summary(final_model)
+```
+'Hour..Coded._9','Hour..Coded._10','Hour..Coded._11','Hour..Coded._13','Hour..Coded._14','Hour..Coded._16','Hour..Coded._17','Hour..Coded._18',,'weekday_Wednesday',,'weekday_Tuesday',
+
+
+```{r}
+checkresiduals(final_model)
+```
+
+```{r}
+AIC(final_model)
+BIC(final_model)
+```
+
+#RMSE-
+```{r}
+final_rmse = predict(final_model, newdata=final_data_fac[,-15])
+calc_rmse<-function(x,y){
+  
+  diff=x-y
+  
+  sqrt(mean(diff^2))
+}
+
+calc_rmse(final_rmse,final_data_fac$Slowness.in.traffic....)
+```
+```{r}
+acf2(final_model$residuals)
+```
+```{r}
+auto.arima(final_model$residuals)
+library(tseries)
+adf.test(final_model$residuals)
+tsplot(final_model$residuals)
+
+box.cox(final_model$residuals)
+
+res_ser<-final_model$residuals
+tsplot(log(final_model$residuals))
+
+lambda<-BoxCox.lambda(res_ser)
+
+plot.ts(BoxCox(res_ser, lambda = lambda))
+
+res_ser.tr<-BoxCox(res_ser, lambda = lambda)
+
+acf2(res_ser.tr)
+
+auto.arima(res_ser.tr)
+```
+```{r}
+
+design<-model.matrix(final_model)[,-1]
+sarima(res_ser.tr,1,0,0,xreg = design)
+```
+
+
+
+```{r}
+fit <- nnetar(data.new$Slowness.in.traffic...., lambda=0)
+autoplot(forecast(fit,h=135))
+```
+
+
 
 # ``````{r}
 # trans_df<-function(df1){
