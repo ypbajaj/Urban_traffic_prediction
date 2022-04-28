@@ -11,6 +11,15 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ```{r}
 library(astsa)
+library(dplyr)
+library(faraway)
+library(lmtest)
+library(MASS)
+
+library(car)
+
+library(Metrics)
+library(leaps)
 ```
 
 
@@ -72,9 +81,130 @@ plot(data$Time,data$Slowness.in.traffic....)
 linear <- lm(Slowness.in.traffic....~.,data=data)
 summary(linear)
 ```
+```{r}
+linear1 <- lm(Slowness.in.traffic....~.-Time,data=data)
+
+x = model.matrix(linear1)[,-1] 
+x = x - matrix(apply(x,2, mean), dim(x)[1],dim(x)[2], byrow=TRUE)
+x = x / matrix(apply(x, 2, sd), dim(x)[1],dim(x)[2], byrow=TRUE)
+#Extracting the eigen-values:
+e = eigen(t(x) %*% x) 
+sqrt(max(e$val)/min(e$val))
+```
 
 ```{r}
-step_linear <- step(linear)
+vif(linear1)
+```
+
+#Leverage points
+```{r}
+n=dim(data)[1]; # sample size
+p=19; # predictors plus intercept
+
+# Compute Leverages
+lev=influence(linear1)$hat
+
+# Determine which exceed the 2p/n threshold
+newlev = lev[lev>2*p/n]
+length(newlev)
+```
+
+```{r}
+length(newlev)/n
+```
+
+```{r}
+# Prepare a half-normal plot 
+halfnorm(lev, ylab="Leverages")
+```
+
+#Checking presence of outliers-
+```{r}
+jackknife=rstudent(linear1)
+n = dim(data)[1]
+p = 19
+x=qt(.05/(2*n), n-p-1) #Significance level adjusted with Bonferroni's Correction
+x
+```
+```{r}
+sort(abs(jackknife),decreasing =T)[1:10]
+```
+#Checking Highly influential points -
+```{r}
+cook = cooks.distance(linear1)
+# Extract max Cook's Distance
+max(cook,na.rm=TRUE)
+```
+
+```{r}
+halfnorm(cook, 6, labs=as.character(1:length(cook)), ylab="Cook's distances")
+```
+
+Since cook's distance is less than 1, we don't remove any data points.
+
+#Checking for normality assumptions -
+```{r}
+plot(linear1,which=1)
+```
+
+Since there is no trend in our residual vs fitted values plot, we see
+that normality assumptions hold true.
+
+#Breush Pagan Test-
+```{r}
+bptest(linear1)
+```
+Since p-value of the test is greater than our significance level of 0.05 , we fail to reject H0 and conclude that the error variance is constant.
+
+#Checking the normality of errors assumption-
+Let’s check if the errors in our model are normally distributed around a mean of zero. For that, we need to look at the histogram of the residuals as well as the Q-Q plot .
+```{r}
+hist(linear1$residuals, breaks = 10)
+```
+
+```{r}
+plot(linear1,which = 2)
+```
+
+#Shapiro-Wilks test-
+```{r}
+shapiro.test(linear1$residuals)
+```
+#Box-Cox -
+```{r}
+box <- boxcox(Slowness.in.traffic....~.,data=data)
+(lambda <- bc$x[which.max(bc$y)])
+```
+
+```{r}
+tran_model <- lm(((Slowness.in.traffic....^lambda-1)/lambda) ~ .,data=data)
+```
+
+```{r}
+shapiro.test(tran_model$residuals)
+```
+
+#Checking the linearity assumption-
+```{r}
+avPlots(linear)
+```
+
+#Train Test Split-
+```{r}
+drop <- c('Time')
+data.new = data[,!(names(data) %in% drop)]
+names(data.new)
+```
+```{r}
+train_index = data.new["weekday"] == 'Friday'
+train = data.new[!train_index,]
+test = data.new[train_index,]
+
+dim(train)
+```
+
+```{r}
+step_linear <- step(linear,direction='both')
 ```
 
 ```{r}
